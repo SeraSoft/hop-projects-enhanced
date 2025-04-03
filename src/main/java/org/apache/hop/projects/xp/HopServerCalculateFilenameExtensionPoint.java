@@ -40,6 +40,7 @@ public class HopServerCalculateFilenameExtensionPoint implements IExtensionPoint
       try {
         String filename = variables.resolve(hopServer.getParameters().get(0));
         FileObject fileObject = HopVfs.getFileObject(filename);
+
         if (!fileObject.exists()) {
           // Try to prepend with ${PROJECT_HOME}
           //
@@ -48,6 +49,16 @@ public class HopServerCalculateFilenameExtensionPoint implements IExtensionPoint
           if (fileObject.exists()) {
             hopServer.setRealFilename(alternativeFilename);
             log.logBasic("Relative path filename specified: " + hopServer.getRealFilename());
+          } else {
+            // Try to prepend with ${LINKED_PROJECT_HOME}
+            //
+            alternativeFilename = variables.resolve("${LINKED_PROJECT_HOME}/" + filename);
+            fileObject = HopVfs.getFileObject(alternativeFilename);
+
+            if (fileObject.exists()) {
+              hopServer.setRealFilename(alternativeFilename);
+              log.logBasic("Relative path filename specified: " + hopServer.getRealFilename());
+            }
           }
         }
       } catch (Exception e) {

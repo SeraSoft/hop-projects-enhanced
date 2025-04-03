@@ -43,9 +43,20 @@ public class HopRunCalculateFilenameExtensionPoint implements IExtensionPoint<Ho
         //
         String alternativeFilename = variables.resolve("${PROJECT_HOME}/" + hopRun.getFilename());
         fileObject = HopVfs.getFileObject(alternativeFilename);
+
         if (fileObject.exists()) {
           hopRun.setRealFilename(alternativeFilename);
           log.logBasic("Relative path filename specified: " + hopRun.getRealFilename());
+        } else {
+          // Try to prepend with ${LINKED_PROJECT_HOME}
+          //
+          alternativeFilename = variables.resolve("${LINKED_PROJECT_HOME}/" + hopRun.getFilename());
+          fileObject = HopVfs.getFileObject(alternativeFilename);
+          if (fileObject.exists()) {
+            hopRun.setRealFilename(alternativeFilename);
+            log.logBasic("Relative path filename specified: " + hopRun.getRealFilename());
+          }
+
         }
       }
     } catch (Exception e) {
