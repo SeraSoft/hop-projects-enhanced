@@ -19,6 +19,7 @@ package org.apache.hop.projects.xp;
 
 import org.apache.commons.lang.StringUtils;
 import org.apache.commons.vfs2.FileObject;
+import org.apache.hop.core.exception.HopException;
 import org.apache.hop.core.extension.ExtensionPoint;
 import org.apache.hop.core.extension.IExtensionPoint;
 import org.apache.hop.core.logging.ILogChannel;
@@ -35,7 +36,8 @@ import org.apache.hop.ui.hopgui.delegates.HopGuiFileOpenedExtension;
 @ExtensionPoint(
     id = "HopGuiFileReplaceHomeVariable",
     extensionPointId = "HopGuiFileOpenedDialog",
-    description = "Replace ${PROJECT_HOME} in selected filenames as a best practice aid")
+    description =
+        "Replace ${PROJECT_HOME} or ${LINKED_PROJECT_HOME} in selected filenames as a best practice aid")
 public class HopGuiFileReplaceHomeVariable implements IExtensionPoint<HopGuiFileOpenedExtension> {
 
   // TODO make this optional
@@ -55,37 +57,77 @@ public class HopGuiFileReplaceHomeVariable implements IExtensionPoint<HopGuiFile
     if (projectConfig == null) {
       return;
     }
-    String homeFolder;
 
+    String linkedProjectName;
+    try {
+      linkedProjectName = projectConfig.loadProject(variables).getLinkedProjectName();
+    } catch (HopException e) {
+      throw new RuntimeException(e);
+    }
+
+    ProjectConfig linkedProjectConfig = null;
+    if (linkedProjectName != null) {
+      log.logDebug("Linked project found for [{0}] named [{1}]", projectName, linkedProjectName);
+      linkedProjectConfig = config.findProjectConfig(linkedProjectName);
+    } else {
+      log.logDebug("No linkedProject found for [{0}]", projectName);
+    }
+
+    String linkedProjectHomeFolder = null;
+    String homeFolder = null;
     if (variables != null) {
       homeFolder = variables.resolve(projectConfig.getProjectHome());
+      if (linkedProjectConfig != null) {
+        linkedProjectHomeFolder = variables.resolve(linkedProjectConfig.getProjectHome());
+      }
     } else {
       homeFolder = projectConfig.getProjectHome();
+      if (linkedProjectConfig != null) {
+        linkedProjectHomeFolder = linkedProjectConfig.getProjectHome();
+      }
     }
 
     try {
+      String absoluteHomeFolder = null;
+      String absoluteLPHomeFolder = null;
+
+      FileObject extFile = HopVfs.getFileObject(ext.filename);
+      String absoluteExtFile = extFile.getName().getPath();
+
       if (StringUtils.isNotEmpty(homeFolder)) {
-
-        FileObject file = HopVfs.getFileObject(ext.filename);
-        String absoluteFile = file.getName().getPath();
-
         FileObject home = HopVfs.getFileObject(homeFolder);
-        String absoluteHome = home.getName().getPath();
+        absoluteHomeFolder = home.getName().getPath();
         // Make the URI always end with a /
-        if (!absoluteHome.endsWith("/")) {
-          absoluteHome += "/";
-        }
-
-        // Replace the project home variable in the filename
-        //
-        if (absoluteFile.startsWith(absoluteHome)) {
-          ext.filename =
-              "${"
-                  + ProjectsUtil.VARIABLE_PROJECT_HOME
-                  + "}/"
-                  + absoluteFile.substring(absoluteHome.length());
+        if (!absoluteHomeFolder.endsWith("/")) {
+          absoluteHomeFolder += "/";
         }
       }
+
+      if (linkedProjectHomeFolder != null) {
+        FileObject linkedProjectHome = HopVfs.getFileObject(linkedProjectHomeFolder);
+        absoluteLPHomeFolder = linkedProjectHome.getName().getPath();
+        // Make the URI always end with a /
+        if (!absoluteLPHomeFolder.endsWith("/")) {
+          absoluteLPHomeFolder += "/";
+        }
+      }
+
+      // Replace the linked project's home variable in the filename
+      //
+      if (absoluteExtFile.startsWith(absoluteHomeFolder)) {
+        ext.filename =
+            "${"
+                + ProjectsUtil.VARIABLE_PROJECT_HOME
+                + "}/"
+                + absoluteExtFile.substring(absoluteHomeFolder.length());
+      } else if (absoluteExtFile.startsWith(absoluteLPHomeFolder)) {
+        ext.filename =
+            "${"
+                + ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME
+                + "}/"
+                + absoluteExtFile.substring(absoluteLPHomeFolder.length());
+      }
+
     } catch (Exception e) {
       log.logError("Error setting default folder for project " + projectName, e);
     }

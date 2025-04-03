@@ -22,17 +22,21 @@ import org.apache.commons.vfs2.FileObject;
 import org.apache.hop.core.Const;
 import org.apache.hop.core.config.DescribedVariablesConfigFile;
 import org.apache.hop.core.exception.HopException;
+import org.apache.hop.core.util.StringUtil;
+import org.apache.hop.core.util.Utils;
 import org.apache.hop.core.variables.IVariables;
 import org.apache.hop.core.vfs.HopVfs;
 import org.apache.hop.i18n.BaseMessages;
 import org.apache.hop.projects.config.ProjectsConfig;
 import org.apache.hop.projects.config.ProjectsConfigSingleton;
+import org.apache.hop.projects.project.Project;
 import org.apache.hop.projects.project.ProjectConfig;
 import org.apache.hop.ui.core.PropsUi;
 import org.apache.hop.ui.core.dialog.BaseDialog;
 import org.apache.hop.ui.core.dialog.ErrorDialog;
 import org.apache.hop.ui.core.dialog.MessageBox;
 import org.apache.hop.ui.core.gui.GuiResource;
+import org.apache.hop.ui.core.gui.HopNamespace;
 import org.apache.hop.ui.core.gui.WindowProperty;
 import org.apache.hop.ui.core.widget.ColumnInfo;
 import org.apache.hop.ui.core.widget.TableView;
@@ -66,6 +70,7 @@ public class LifecycleEnvironmentDialog extends Dialog {
   private Text wName;
   private Combo wPurpose;
   private Combo wProject;
+  private Combo wLinkedProjectEnv;
   private TableView wConfigFiles;
 
   private IVariables variables;
@@ -171,6 +176,25 @@ public class LifecycleEnvironmentDialog extends Dialog {
     wProject.setLayoutData(fdProject);
     wProject.addListener(SWT.Modify, e -> needingEnvironmentRefresh = true);
     lastControl = wProject;
+
+    Label wlLinkedProjectEnv = new Label(shell, SWT.RIGHT);
+    PropsUi.setLook(wlLinkedProjectEnv);
+    wlLinkedProjectEnv.setText(
+        BaseMessages.getString(PKG, "LifecycleEnvironmentDialog.Label.LinkedProjectEnv"));
+    FormData fdlLinkedProjectEnv = new FormData();
+    fdlLinkedProjectEnv.left = new FormAttachment(0, 0);
+    fdlLinkedProjectEnv.right = new FormAttachment(middle, 0);
+    fdlLinkedProjectEnv.top = new FormAttachment(lastControl, margin);
+    wlLinkedProjectEnv.setLayoutData(fdlLinkedProjectEnv);
+    wLinkedProjectEnv = new Combo(shell, SWT.SINGLE | SWT.BORDER | SWT.LEFT);
+    PropsUi.setLook(wLinkedProjectEnv);
+    FormData fdLinkedProjectEnv = new FormData();
+    fdLinkedProjectEnv.left = new FormAttachment(middle, margin);
+    fdLinkedProjectEnv.right = new FormAttachment(100, 0);
+    fdLinkedProjectEnv.top = new FormAttachment(wlLinkedProjectEnv, 0, SWT.CENTER);
+    wLinkedProjectEnv.setLayoutData(fdLinkedProjectEnv);
+    // wLinkedProjectEnv.addListener(SWT.Modify, e -> needingEnvironmentRefresh = true);
+    lastControl = wLinkedProjectEnv;
 
     Label wlConfigFiles = new Label(shell, SWT.LEFT);
     PropsUi.setLook(wlConfigFiles);
@@ -402,6 +426,34 @@ public class LifecycleEnvironmentDialog extends Dialog {
         BaseMessages.getString(PKG, "LifecycleEnvironmentDialog.Purpose.Text.CI"),
         BaseMessages.getString(PKG, "LifecycleEnvironmentDialog.Purpose.Text.CB"));
 
+    // Is there an active project?
+    //
+    String currentProjectName = HopNamespace.getNamespace();
+    if (StringUtil.isEmpty(currentProjectName)) {
+      return;
+    }
+
+    ProjectConfig activeProjectConfig = config.findProjectConfig(currentProjectName);
+    if (activeProjectConfig == null) {
+      return;
+    }
+    Project linkedProject;
+    try {
+      linkedProject = activeProjectConfig.loadProject(variables);
+
+    } catch (HopException e) {
+      throw new RuntimeException(e);
+    }
+
+    wLinkedProjectEnv.setItems(
+        config.getLifecycleEnvironments().stream()
+            .filter(e -> e.getProjectName().equals(linkedProject.getLinkedProjectName()))
+            .map(LifecycleEnvironment::getName)
+            .toArray(String[]::new));
+    if (!Utils.isEmpty(environment.getLinkedProjectEnv())) {
+      wLinkedProjectEnv.setText(environment.getLinkedProjectEnv());
+    }
+
     wName.setText(Const.NVL(environment.getName(), ""));
     wPurpose.setText(Const.NVL(environment.getPurpose(), ""));
     wProject.setText(Const.NVL(environment.getProjectName(), ""));
@@ -426,6 +478,7 @@ public class LifecycleEnvironmentDialog extends Dialog {
     env.setName(wName.getText());
     env.setPurpose(wPurpose.getText());
     env.setProjectName(wProject.getText());
+    env.setLinkedProjectEnv(wLinkedProjectEnv.getText());
 
     env.getConfigurationFiles().clear();
     for (TableItem item : wConfigFiles.getNonEmptyItems()) {

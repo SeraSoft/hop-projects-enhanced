@@ -70,9 +70,9 @@ public class ManageProjectsOptionPlugin implements IConfigOptions {
   private String projectHome;
 
   @CommandLine.Option(
-      names = {"-pr", "--project-parent"},
-      description = "The name of the parent project to inherit metadata and variables from")
-  private String projectParent;
+      names = {"-pr", "--project-linked"},
+      description = "The name of the linked project to inherit metadata and variables from")
+  private String projectLinked;
 
   @CommandLine.Option(
       names = {"-pf", "--project-config-file"},
@@ -221,8 +221,8 @@ public class ManageProjectsOptionPlugin implements IConfigOptions {
       throws HopException {
     String projectHome = projectConfig.getProjectHome();
     log.logBasic("  " + projectConfig.getProjectName() + " : " + projectHome);
-    if (StringUtils.isNotEmpty(project.getParentProjectName())) {
-      log.logBasic("    Parent project: " + project.getParentProjectName());
+    if (StringUtils.isNotEmpty(project.getLinkedProjectName())) {
+      log.logBasic("    Linked project: " + project.getLinkedProjectName());
     }
     log.logBasic(
         "    Configuration file: "
@@ -303,8 +303,8 @@ public class ManageProjectsOptionPlugin implements IConfigOptions {
 
   private boolean modifyProjectSettings(Project project) {
     boolean changed = false;
-    if (StringUtils.isNotEmpty(projectParent)) {
-      project.setParentProjectName(projectParent);
+    if (StringUtils.isNotEmpty(projectLinked)) {
+      project.setLinkedProjectName(projectLinked);
       changed = true;
     }
     if (StringUtils.isNotEmpty(projectDescription)) {
@@ -381,7 +381,7 @@ public class ManageProjectsOptionPlugin implements IConfigOptions {
     log.logBasic(CONST_PROJECT + projectName + "' was created for home folder : " + projectHome);
 
     Project project = projectConfig.loadProject(variables);
-    project.setParentProjectName(config.getStandardParentProject());
+    project.setLinkedProjectName(config.getStandardLinkedProject());
     modifyProjectSettings(project);
 
     // Check to see if there's not a loop in the project parent hierarchy

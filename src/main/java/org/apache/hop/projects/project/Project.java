@@ -47,6 +47,7 @@ import org.apache.hop.core.exception.HopException;
 import org.apache.hop.core.exception.HopFileException;
 import org.apache.hop.core.json.HopJson;
 import org.apache.hop.core.logging.LogChannel;
+import org.apache.hop.core.util.Utils;
 import org.apache.hop.core.variables.DescribedVariable;
 import org.apache.hop.core.variables.IVariables;
 import org.apache.hop.core.variables.Variables;
@@ -61,6 +62,7 @@ import org.apache.hop.pipeline.PipelineMeta;
 import org.apache.hop.pipeline.transform.TransformMeta;
 import org.apache.hop.projects.config.ProjectsConfig;
 import org.apache.hop.projects.config.ProjectsConfigSingleton;
+import org.apache.hop.projects.environment.LifecycleEnvironment;
 import org.apache.hop.projects.util.Defaults;
 import org.apache.hop.projects.util.ProjectsUtil;
 import org.apache.hop.workflow.WorkflowMeta;
@@ -84,7 +86,7 @@ public class Project extends ConfigFile implements IConfigFile {
 
   private boolean enforcingExecutionInHome;
 
-  private String parentProjectName;
+  private String linkedProjectName;
 
   private MultiMetadataProvider metadataProvider;
 
@@ -149,7 +151,7 @@ public class Project extends ConfigFile implements IConfigFile {
       this.dataSetsCsvFolder = project.dataSetsCsvFolder;
       this.enforcingExecutionInHome = project.enforcingExecutionInHome;
       this.configMap = project.configMap;
-      this.parentProjectName = project.parentProjectName;
+      this.linkedProjectName = project.linkedProjectName;
     } catch (Exception e) {
       throw new HopException(
           "Error saving project configuration to file '" + configFilename + "'", e);
@@ -167,28 +169,49 @@ public class Project extends ConfigFile implements IConfigFile {
       variables = Variables.getADefaultVariableSpace();
     }
 
+    ProjectsConfig config = ProjectsConfigSingleton.getConfig();
+    if (config == null) {
+      throw new HopException("No project configuration found");
+    }
+
     // See if we don't have an infinite loop in the project-parent-parent-... hierarchy...
     //
     verifyProjectsChain(projectConfig.getProjectName(), variables);
 
-    // If there is a parent project we want to pick up the variables defined in the project
+    // If there is a linked project we want to pick up the variables defined in the project
     // definition as well
     //
-    Project parentProject = null;
-    String realParentProjectName = variables.resolve(parentProjectName);
-    if (StringUtils.isNotEmpty(realParentProjectName)) {
+    Project linkedProject = null;
+    String linkedProjectMetadataFolder = null;
+    String realLinkedProjectName = variables.resolve(linkedProjectName);
 
-      ProjectConfig parentProjectConfig =
-          ProjectsConfigSingleton.getConfig().findProjectConfig(realParentProjectName);
-      if (parentProjectConfig != null) {
+    if (StringUtils.isNotEmpty(realLinkedProjectName)) {
+      ProjectConfig linkedProjectConfig =
+          ProjectsConfigSingleton.getConfig().findProjectConfig(realLinkedProjectName);
+      if (linkedProjectConfig != null) {
         try {
-          parentProject = parentProjectConfig.loadProject(variables);
-          // Apply the variables set in the parent project
-          //
-          parentProject.modifyVariables(variables, parentProjectConfig, new ArrayList<>(), null);
+          linkedProject = linkedProjectConfig.loadProject(variables);
+          linkedProjectMetadataFolder = linkedProject.getMetadataBaseFolder().replace(ProjectsUtil.VARIABLE_PROJECT_HOME, ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME);
+
+          LifecycleEnvironment currEnv = config.findEnvironment(environmentName);
+          LifecycleEnvironment linkedProjectEnv =
+              config.getLifecycleEnvironments().stream()
+                  .filter(e -> e.getName().equals(currEnv.getLinkedProjectEnv()))
+                  .findFirst()
+                  .orElse(null);
+
+
+          // Set the LINKED_PROJECT_NAME variable to the root of the linked project name
+          variables.setVariable(
+              ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME,
+              Const.NVL(linkedProjectConfig.getProjectHome(), ""));
+
+          // Set the environment name of the linked project
+          updateVariablesFromEnvironment(variables, linkedProjectEnv.getConfigurationFiles(), true);
+
         } catch (HopException he) {
           LogChannel.GENERAL.logError(
-              "Error loading configuration file of parent project '" + realParentProjectName + "'",
+              "Error loading configuration file of linked project '" + realLinkedProjectName + "'",
               he);
         }
       }
@@ -207,9 +230,55 @@ public class Project extends ConfigFile implements IConfigFile {
       variables.setVariable(ProjectsUtil.VARIABLE_PROJECT_HOME, realValue);
     }
 
+    updateVariablesFromEnvironment(variables, configurationFiles, true);
+
+    if (StringUtils.isNotEmpty(metadataBaseFolder)) {
+      String realMetadataBaseFolder = variables.resolve(metadataBaseFolder);
+
+      // If we have more than one metadata base folder to read metadata from, we can specify it
+      // using comma separated values...
+      //
+      if (!Utils.isEmpty(linkedProjectMetadataFolder)) {
+          realMetadataBaseFolder = variables.resolve(linkedProjectMetadataFolder) + "," + realMetadataBaseFolder;
+      }
+      variables.setVariable(Const.HOP_METADATA_FOLDER, realMetadataBaseFolder);
+    }
+
+    if (StringUtils.isNotEmpty(unitTestsBasePath)) {
+      String realValue = variables.resolve(unitTestsBasePath);
+      variables.setVariable(ProjectsUtil.VARIABLE_HOP_UNIT_TESTS_FOLDER, realValue);
+    }
+    if (StringUtils.isNotEmpty(dataSetsCsvFolder)) {
+      String realValue = variables.resolve(dataSetsCsvFolder);
+      variables.setVariable(ProjectsUtil.VARIABLE_HOP_DATASETS_FOLDER, realValue);
+    }
+    for (DescribedVariable variable : getDescribedVariables()) {
+      if (variable.getName() != null) {
+        variables.setVariable(variable.getName(), variable.getValue());
+      }
+    }
+  }
+
+  private static void updateVariablesFromEnvironment(
+      IVariables variables, List<String> configurationFiles) throws HopFileException {
+    updateVariablesFromEnvironment(variables, configurationFiles, false);
+  }
+
+  private static void updateVariablesFromEnvironment(
+      IVariables variables, List<String> configurationFiles, boolean isLinkedProject)
+      throws HopFileException {
     // Apply the described variables from the various configuration files in the given order...
     //
     for (String configurationFile : configurationFiles) {
+
+      if (isLinkedProject) {
+        // if is linked project, replace the project home with the linked project home to get the
+        // right path to configuration file
+        configurationFile =
+                configurationFile.replace(
+                ProjectsUtil.VARIABLE_PROJECT_HOME, ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME);
+      }
+
       String realConfigurationFile = variables.resolve(configurationFile);
 
       FileObject file = HopVfs.getFileObject(realConfigurationFile);
@@ -239,37 +308,6 @@ public class Project extends ConfigFile implements IConfigFile {
             e);
       }
     }
-
-    if (StringUtils.isNotEmpty(metadataBaseFolder)) {
-      String realMetadataBaseFolder = variables.resolve(metadataBaseFolder);
-
-      // If we have more than one metadata base folder to read metadata from, we can specify it
-      // using comma separated values...
-      //
-      if (parentProject != null) {
-        // HOP_METADATA_FOLDER was set above in the variables.
-        // We're going to simply append to it.
-        //
-        String parentMetadataFolder = variables.getVariable(Const.HOP_METADATA_FOLDER);
-        if (StringUtils.isNotEmpty(parentMetadataFolder)) {
-          realMetadataBaseFolder = parentMetadataFolder + "," + realMetadataBaseFolder;
-        }
-      }
-      variables.setVariable(Const.HOP_METADATA_FOLDER, realMetadataBaseFolder);
-    }
-    if (StringUtils.isNotEmpty(unitTestsBasePath)) {
-      String realValue = variables.resolve(unitTestsBasePath);
-      variables.setVariable(ProjectsUtil.VARIABLE_HOP_UNIT_TESTS_FOLDER, realValue);
-    }
-    if (StringUtils.isNotEmpty(dataSetsCsvFolder)) {
-      String realValue = variables.resolve(dataSetsCsvFolder);
-      variables.setVariable(ProjectsUtil.VARIABLE_HOP_DATASETS_FOLDER, realValue);
-    }
-    for (DescribedVariable variable : getDescribedVariables()) {
-      if (variable.getName() != null) {
-        variables.setVariable(variable.getName(), variable.getValue());
-      }
-    }
   }
 
   /**
@@ -279,44 +317,44 @@ public class Project extends ConfigFile implements IConfigFile {
    */
   public void verifyProjectsChain(String projectName, IVariables variables) throws HopException {
 
-    // No parent project: no danger
+    // No linked project: no danger
     //
-    if (StringUtils.isEmpty(parentProjectName)) {
+    if (StringUtils.isEmpty(linkedProjectName)) {
       return;
     }
 
-    if (parentProjectName.equals(projectName)) {
+    if (linkedProjectName.equals(projectName)) {
       throw new HopException(
-          "Parent project '" + parentProjectName + "' can not be the same as the project itself");
+          "Parent project '" + linkedProjectName + "' can not be the same as the project itself");
     }
 
     ProjectsConfig config = ProjectsConfigSingleton.getConfig();
 
-    String realParentProjectName = variables.resolve(parentProjectName);
+    String realLinkedProjectName = variables.resolve(linkedProjectName);
     List<String> projectsList = new ArrayList<>();
-    while (StringUtils.isNotEmpty(realParentProjectName)) {
-      projectsList.add(realParentProjectName);
-      ProjectConfig projectConfig = config.findProjectConfig(realParentProjectName);
+    while (StringUtils.isNotEmpty(realLinkedProjectName)) {
+      projectsList.add(realLinkedProjectName);
+      ProjectConfig projectConfig = config.findProjectConfig(realLinkedProjectName);
       if (projectConfig != null) {
-        Project parentProject = projectConfig.loadProject(variables);
-        if (parentProject == null) {
+        Project linkedProject = projectConfig.loadProject(variables);
+        if (linkedProject == null) {
           // Can't be loaded, break out of the loop
-          realParentProjectName = null;
+          realLinkedProjectName = null;
         } else {
           // See if this project has a parent...
           //
-          if (StringUtils.isEmpty(parentProject.parentProjectName)) {
+          if (StringUtils.isEmpty(linkedProject.linkedProjectName)) {
             // We're done
-            realParentProjectName = null;
+            realLinkedProjectName = null;
           } else {
-            realParentProjectName = variables.resolve(parentProject.parentProjectName);
-            if (StringUtils.isNotEmpty(realParentProjectName)) {
+            realLinkedProjectName = variables.resolve(linkedProject.linkedProjectName);
+            if (StringUtils.isNotEmpty(realLinkedProjectName)) {
               // See if we've had this one before...
               //
-              if (projectsList.contains(realParentProjectName)) {
+              if (projectsList.contains(realLinkedProjectName)) {
                 throw new HopException(
-                    "There is a loop in the parent projects hierarchy: project "
-                        + realParentProjectName
+                    "There is a loop in the linked projects hierarchy: project "
+                        + realLinkedProjectName
                         + " references itself");
               }
             }
@@ -324,7 +362,7 @@ public class Project extends ConfigFile implements IConfigFile {
         }
       } else {
         // Project not found: config error, stop looking
-        realParentProjectName = null;
+        realLinkedProjectName = null;
       }
     }
   }
@@ -738,15 +776,15 @@ public class Project extends ConfigFile implements IConfigFile {
    *
    * @return value of parentProjectName
    */
-  public String getParentProjectName() {
-    return parentProjectName;
+  public String getLinkedProjectName() {
+    return linkedProjectName;
   }
 
   /**
-   * @param parentProjectName The parentProjectName to set
+   * @param linkedProjectName The parentProjectName to set
    */
-  public void setParentProjectName(String parentProjectName) {
-    this.parentProjectName = parentProjectName;
+  public void setLinkedProjectName(String linkedProjectName) {
+    this.linkedProjectName = linkedProjectName;
   }
 
   public MultiMetadataProvider getMetadataProvider() {

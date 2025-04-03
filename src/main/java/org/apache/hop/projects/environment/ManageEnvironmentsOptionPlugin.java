@@ -57,6 +57,11 @@ public class ManageEnvironmentsOptionPlugin implements IConfigOptions {
   private String environmentName;
 
   @CommandLine.Option(
+          names = {"-elp", "--environment-linked-project"},
+          description = "The name of environment of the linked project to use when referencing current's project environment")
+  private String projectLinkedEnvironment;
+
+  @CommandLine.Option(
       names = {"-eu", "--environment-purpose"},
       description = "The purpose of the environment: Development, Testing, Production, CI, ...")
   private String environmentPurpose;
@@ -275,6 +280,11 @@ public class ManageEnvironmentsOptionPlugin implements IConfigOptions {
       environment.getConfigurationFiles().addAll(Arrays.asList(environmentConfigFiles));
       changed = true;
     }
+    if (StringUtils.isNotEmpty(projectLinkedEnvironment)) {
+      environment.setLinkedProjectEnv(projectLinkedEnvironment);
+      changed = true;
+    }
+
     return changed;
   }
 
@@ -282,6 +292,15 @@ public class ManageEnvironmentsOptionPlugin implements IConfigOptions {
     if (StringUtil.isEmpty(environmentName)) {
       throw new HopException("Please specify the name of the environment to create");
     }
+  }
+
+
+  public String getProjectLinkedEnvironment() {
+    return projectLinkedEnvironment;
+  }
+
+  public void setProjectLinkedEnvironment(String projectLinkedEnvironment) {
+    this.projectLinkedEnvironment = projectLinkedEnvironment;
   }
 
   /**

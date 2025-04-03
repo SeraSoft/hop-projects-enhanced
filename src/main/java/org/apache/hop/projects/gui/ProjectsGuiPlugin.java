@@ -577,7 +577,7 @@ public class ProjectsGuiPlugin {
           new ProjectConfig("", standardProjectsFolder, defaultProjectConfigFilename);
 
       Project project = new Project();
-      project.setParentProjectName(config.getStandardParentProject());
+      project.setLinkedProjectName(config.getStandardLinkedProject());
 
       ProjectDialog projectDialog =
           new ProjectDialog(hopGui.getActiveShell(), project, projectConfig, variables, false);
@@ -718,7 +718,7 @@ public class ProjectsGuiPlugin {
 
     try {
 
-      List<String> refs = ProjectsUtil.getParentProjectReferences(projectName);
+      List<String> refs = ProjectsUtil.getLinkedProjectReferences(projectName);
 
       if (refs.isEmpty()) {
         performProjectDeletion(projectName, config, projectHome, configFilename);
@@ -728,15 +728,15 @@ public class ProjectsGuiPlugin {
             new MessageBox(HopGui.getInstance().getShell(), SWT.OK | SWT.ICON_INFORMATION);
         box.setText(
             BaseMessages.getString(
-                PKG, "ProjectGuiPlugin.DeleteProject.ProjectReferencedAsParent.Header"));
+                PKG, "ProjectGuiPlugin.DeleteProject.ProjectReferencedAsLinked.Header"));
         box.setMessage(
             BaseMessages.getString(
-                    PKG, "ProjectGuiPlugin.DeleteProject.ProjectReferencedAsParent.Message1")
+                    PKG, "ProjectGuiPlugin.DeleteProject.ProjectReferencedAsLinked.Message1")
                 + Const.CR
                 + prjReferences
                 + Const.CR
                 + BaseMessages.getString(
-                    PKG, "ProjectGuiPlugin.DeleteProject.ProjectReferencedAsParent.Message2"));
+                    PKG, "ProjectGuiPlugin.DeleteProject.ProjectReferencedAsLinked.Message2"));
         box.open();
       }
     } catch (Exception e) {
@@ -1308,7 +1308,7 @@ public class ProjectsGuiPlugin {
    * @param fileToZip the file to add
    * @param filename destination filename
    * @param zipOutputStream zip output stream to append the file to
-   * @param projectHomeParent project home folder to be stripped from the base path
+   * @param linkedProjectHome linked project home folder to be stripped from the base path
    * @param zipFilename name of the destination zip file
    * @throws IOException when failing to add a file to the zip
    */
@@ -1316,7 +1316,7 @@ public class ProjectsGuiPlugin {
       FileObject fileToZip,
       String filename,
       ZipOutputStream zipOutputStream,
-      String projectHomeParent,
+      String linkedProjectHome,
       String zipFilename)
       throws IOException {
     if (fileToZip.isHidden()) {
@@ -1324,11 +1324,11 @@ public class ProjectsGuiPlugin {
     }
     if (fileToZip.isFolder()) {
       if (filename.endsWith("/")) {
-        zipOutputStream.putNextEntry(new ZipEntry(filename.replaceAll(projectHomeParent, "")));
+        zipOutputStream.putNextEntry(new ZipEntry(filename.replaceAll(linkedProjectHome, "")));
         zipOutputStream.closeEntry();
       } else {
         zipOutputStream.putNextEntry(
-            new ZipEntry(filename.replaceAll(projectHomeParent, "") + "/"));
+            new ZipEntry(filename.replaceAll(linkedProjectHome, "") + "/"));
         zipOutputStream.closeEntry();
       }
       FileObject[] children = fileToZip.getChildren();
@@ -1340,13 +1340,13 @@ public class ProjectsGuiPlugin {
             childFile,
             filename + "/" + childFile.getName().getBaseName(),
             zipOutputStream,
-            projectHomeParent,
+                linkedProjectHome,
             zipFilename);
       }
       return;
     }
     InputStream fis = HopVfs.getInputStream(fileToZip);
-    ZipEntry zipEntry = new ZipEntry(filename.replaceAll(projectHomeParent, ""));
+    ZipEntry zipEntry = new ZipEntry(filename.replaceAll(linkedProjectHome, ""));
     zipOutputStream.putNextEntry(zipEntry);
     byte[] bytes = new byte[1024];
     int length;
@@ -1363,20 +1363,20 @@ public class ProjectsGuiPlugin {
    * @param stringToZip the string that needs to be added to the zip file
    * @param filename the destination filename inside the zip
    * @param zipOutputStream output stream of the zip file
-   * @param projectHomeParent the root folder of the zip file
+   * @param linkedProjectHome the root folder of the zip file
    * @throws IOException when adding to the zip file fails
    */
   public void zipString(
       String stringToZip,
       String filename,
       ZipOutputStream zipOutputStream,
-      String projectHomeParent)
+      String linkedProjectHome)
       throws IOException {
     if (stringToZip == null || stringToZip.isEmpty()) {
       return;
     }
     ByteArrayInputStream bais = new ByteArrayInputStream(stringToZip.getBytes());
-    zipOutputStream.putNextEntry(new ZipEntry(projectHomeParent + "/" + filename));
+    zipOutputStream.putNextEntry(new ZipEntry(linkedProjectHome + "/" + filename));
     byte[] bytes = new byte[1024];
     int length;
     while ((length = bais.read(bytes)) >= 0) {

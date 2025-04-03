@@ -39,7 +39,7 @@ public class ProjectsConfig {
   private boolean environmentsForActiveProject;
   private String defaultProject;
   private String defaultEnvironment;
-  private String standardParentProject;
+  private String standardLinkedProject;
   private String standardProjectsFolder;
   private String defaultProjectConfigFile;
 
@@ -65,7 +65,7 @@ public class ProjectsConfig {
     environmentMandatory = config.environmentMandatory;
     defaultProject = config.defaultProject;
     defaultEnvironment = config.defaultEnvironment;
-    standardParentProject = config.standardParentProject;
+    standardLinkedProject = config.standardLinkedProject;
     standardProjectsFolder = config.standardProjectsFolder;
     defaultProjectConfigFile = config.defaultProjectConfigFile;
     environmentsForActiveProject = config.environmentsForActiveProject;
@@ -346,19 +346,19 @@ public class ProjectsConfig {
   }
 
   /**
-   * Gets standardParentProject
+   * Gets standardLinkedProject
    *
-   * @return value of standardParentProject
+   * @return value of standardLinkedProject
    */
-  public String getStandardParentProject() {
-    return standardParentProject;
+  public String getStandardLinkedProject() {
+    return standardLinkedProject;
   }
 
   /**
-   * @param standardParentProject The standardParentProject to set
+   * @param standardLinkedProject The standardLinkedProject to set
    */
-  public void setStandardParentProject(String standardParentProject) {
-    this.standardParentProject = standardParentProject;
+  public void setStandardLinkedProject(String standardLinkedProject) {
+    this.standardLinkedProject = standardLinkedProject;
   }
 
   /**
