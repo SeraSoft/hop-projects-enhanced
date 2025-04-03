@@ -17,6 +17,8 @@
 
 package org.apache.hop.projects.environment;
 
+import lombok.Data;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -29,6 +31,8 @@ public class LifecycleEnvironment {
   private String purpose;
 
   private String projectName;
+
+  private String linkedProjectEnv;
 
   private List<String> configurationFiles;
 
@@ -66,6 +70,22 @@ public class LifecycleEnvironment {
   @Override
   public int hashCode() {
     return Objects.hash(name);
+  }
+
+  /**
+   * Gets linkedProjectEnv
+   *
+   * @return
+   */
+  public String getLinkedProjectEnv() {
+    return linkedProjectEnv;
+  }
+
+  /**
+   * @param linkedProjectEnv The linkedProjectEnv to set
+   */
+  public void setLinkedProjectEnv(String linkedProjectEnv) {
+    this.linkedProjectEnv = linkedProjectEnv;
   }
 
   /**

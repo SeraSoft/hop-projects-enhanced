@@ -47,6 +47,7 @@ import org.apache.hop.core.exception.HopException;
 import org.apache.hop.core.exception.HopFileException;
 import org.apache.hop.core.json.HopJson;
 import org.apache.hop.core.logging.LogChannel;
+import org.apache.hop.core.util.Utils;
 import org.apache.hop.core.variables.DescribedVariable;
 import org.apache.hop.core.variables.IVariables;
 import org.apache.hop.core.variables.Variables;
@@ -61,6 +62,7 @@ import org.apache.hop.pipeline.PipelineMeta;
 import org.apache.hop.pipeline.transform.TransformMeta;
 import org.apache.hop.projects.config.ProjectsConfig;
 import org.apache.hop.projects.config.ProjectsConfigSingleton;
+import org.apache.hop.projects.environment.LifecycleEnvironment;
 import org.apache.hop.projects.util.Defaults;
 import org.apache.hop.projects.util.ProjectsUtil;
 import org.apache.hop.workflow.WorkflowMeta;
@@ -167,6 +169,11 @@ public class Project extends ConfigFile implements IConfigFile {
       variables = Variables.getADefaultVariableSpace();
     }
 
+    ProjectsConfig config = ProjectsConfigSingleton.getConfig();
+    if (config == null) {
+      throw new HopException("No project configuration found");
+    }
+
     // See if we don't have an infinite loop in the project-parent-parent-... hierarchy...
     //
     verifyProjectsChain(projectConfig.getProjectName(), variables);
@@ -175,21 +182,33 @@ public class Project extends ConfigFile implements IConfigFile {
     // definition as well
     //
     Project linkedProject = null;
+    String linkedProjectMetadataFolder = null;
     String realLinkedProjectName = variables.resolve(linkedProjectName);
-    if (StringUtils.isNotEmpty(realLinkedProjectName)) {
 
+    if (StringUtils.isNotEmpty(realLinkedProjectName)) {
       ProjectConfig linkedProjectConfig =
           ProjectsConfigSingleton.getConfig().findProjectConfig(realLinkedProjectName);
       if (linkedProjectConfig != null) {
         try {
           linkedProject = linkedProjectConfig.loadProject(variables);
-          // Apply the variables set in the linked project
-          //
-          linkedProject.modifyVariables(variables, linkedProjectConfig, new ArrayList<>(), null);
+          linkedProjectMetadataFolder = linkedProject.getMetadataBaseFolder().replace(ProjectsUtil.VARIABLE_PROJECT_HOME, ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME);
+
+          LifecycleEnvironment currEnv = config.findEnvironment(environmentName);
+          LifecycleEnvironment linkedProjectEnv =
+              config.getLifecycleEnvironments().stream()
+                  .filter(e -> e.getName().equals(currEnv.getLinkedProjectEnv()))
+                  .findFirst()
+                  .orElse(null);
+
+
           // Set the LINKED_PROJECT_NAME variable to the root of the linked project name
-            variables.setVariable(
-                ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME,
-                Const.NVL(linkedProjectConfig.getProjectHome(), ""));
+          variables.setVariable(
+              ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME,
+              Const.NVL(linkedProjectConfig.getProjectHome(), ""));
+
+          // Set the environment name of the linked project
+          updateVariablesFromEnvironment(variables, linkedProjectEnv.getConfigurationFiles(), true);
+
         } catch (HopException he) {
           LogChannel.GENERAL.logError(
               "Error loading configuration file of linked project '" + realLinkedProjectName + "'",
@@ -211,9 +230,55 @@ public class Project extends ConfigFile implements IConfigFile {
       variables.setVariable(ProjectsUtil.VARIABLE_PROJECT_HOME, realValue);
     }
 
+    updateVariablesFromEnvironment(variables, configurationFiles, true);
+
+    if (StringUtils.isNotEmpty(metadataBaseFolder)) {
+      String realMetadataBaseFolder = variables.resolve(metadataBaseFolder);
+
+      // If we have more than one metadata base folder to read metadata from, we can specify it
+      // using comma separated values...
+      //
+      if (!Utils.isEmpty(linkedProjectMetadataFolder)) {
+          realMetadataBaseFolder = variables.resolve(linkedProjectMetadataFolder) + "," + realMetadataBaseFolder;
+      }
+      variables.setVariable(Const.HOP_METADATA_FOLDER, realMetadataBaseFolder);
+    }
+
+    if (StringUtils.isNotEmpty(unitTestsBasePath)) {
+      String realValue = variables.resolve(unitTestsBasePath);
+      variables.setVariable(ProjectsUtil.VARIABLE_HOP_UNIT_TESTS_FOLDER, realValue);
+    }
+    if (StringUtils.isNotEmpty(dataSetsCsvFolder)) {
+      String realValue = variables.resolve(dataSetsCsvFolder);
+      variables.setVariable(ProjectsUtil.VARIABLE_HOP_DATASETS_FOLDER, realValue);
+    }
+    for (DescribedVariable variable : getDescribedVariables()) {
+      if (variable.getName() != null) {
+        variables.setVariable(variable.getName(), variable.getValue());
+      }
+    }
+  }
+
+  private static void updateVariablesFromEnvironment(
+      IVariables variables, List<String> configurationFiles) throws HopFileException {
+    updateVariablesFromEnvironment(variables, configurationFiles, false);
+  }
+
+  private static void updateVariablesFromEnvironment(
+      IVariables variables, List<String> configurationFiles, boolean isLinkedProject)
+      throws HopFileException {
     // Apply the described variables from the various configuration files in the given order...
     //
     for (String configurationFile : configurationFiles) {
+
+      if (isLinkedProject) {
+        // if is linked project, replace the project home with the linked project home to get the
+        // right path to configuration file
+        configurationFile =
+                configurationFile.replace(
+                ProjectsUtil.VARIABLE_PROJECT_HOME, ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME);
+      }
+
       String realConfigurationFile = variables.resolve(configurationFile);
 
       FileObject file = HopVfs.getFileObject(realConfigurationFile);
@@ -241,37 +306,6 @@ public class Project extends ConfigFile implements IConfigFile {
                 + realConfigurationFile
                 + "'",
             e);
-      }
-    }
-
-    if (StringUtils.isNotEmpty(metadataBaseFolder)) {
-      String realMetadataBaseFolder = variables.resolve(metadataBaseFolder);
-
-      // If we have more than one metadata base folder to read metadata from, we can specify it
-      // using comma separated values...
-      //
-      if (linkedProject != null) {
-        // HOP_METADATA_FOLDER was set above in the variables.
-        // We're going to simply append to it.
-        //
-        String parentMetadataFolder = variables.getVariable(Const.HOP_METADATA_FOLDER);
-        if (StringUtils.isNotEmpty(parentMetadataFolder)) {
-          realMetadataBaseFolder = parentMetadataFolder + "," + realMetadataBaseFolder;
-        }
-      }
-      variables.setVariable(Const.HOP_METADATA_FOLDER, realMetadataBaseFolder);
-    }
-    if (StringUtils.isNotEmpty(unitTestsBasePath)) {
-      String realValue = variables.resolve(unitTestsBasePath);
-      variables.setVariable(ProjectsUtil.VARIABLE_HOP_UNIT_TESTS_FOLDER, realValue);
-    }
-    if (StringUtils.isNotEmpty(dataSetsCsvFolder)) {
-      String realValue = variables.resolve(dataSetsCsvFolder);
-      variables.setVariable(ProjectsUtil.VARIABLE_HOP_DATASETS_FOLDER, realValue);
-    }
-    for (DescribedVariable variable : getDescribedVariables()) {
-      if (variable.getName() != null) {
-        variables.setVariable(variable.getName(), variable.getValue());
       }
     }
   }
