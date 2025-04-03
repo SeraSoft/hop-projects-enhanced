@@ -61,7 +61,7 @@ public class ProjectsConfigOptionPlugin
   private static final String WIDGET_ID_ENVIRONMENT_MANDATORY = "10020-environment-mandatory";
   private static final String WIDGET_ID_DEFAULT_PROJECT = "10030-default-project";
   private static final String WIDGET_ID_DEFAULT_ENVIRONMENT = "10040-default-environment";
-  private static final String WIDGET_ID_STANDARD_PARENT_PROJECT = "10050-standard-parent-project";
+  private static final String WIDGET_ID_STANDARD_LINKED_PROJECT = "10050-standard-linked-project";
   private static final String WIDGET_ID_STANDARD_PROJECTS_FOLDER = "10060-standard-projects-folder";
   private static final String WIDGET_ID_RESTRICT_ENVIRONMENTS_TO_ACTIVE_PROJECT =
       "10070-restrict-environments-to-active-project";
@@ -122,17 +122,17 @@ public class ProjectsConfigOptionPlugin
   private String defaultEnvironment;
 
   @GuiWidgetElement(
-      id = WIDGET_ID_STANDARD_PARENT_PROJECT,
+      id = WIDGET_ID_STANDARD_LINKED_PROJECT,
       parentId = ConfigPluginOptionsTab.GUI_WIDGETS_PARENT_ID,
       type = GuiElementType.COMBO,
       comboValuesMethod = "getProjectsList",
       variables = true,
-      label = "i18n::ProjectConfig.ParentProject.Message")
+      label = "i18n::ProjectConfig.LinkedProject.Message")
   @CommandLine.Option(
-      names = {"-sp", "--standard-parent-project"},
+      names = {"-sp", "--standard-linked-project"},
       description =
-          "The name of the standard project to use as a parent when creating new projects")
-  private String standardParentProject;
+          "The name of the project to use as a linked when creating new projects")
+  private String standardLinkedProject;
 
   @GuiWidgetElement(
       id = WIDGET_ID_STANDARD_PROJECTS_FOLDER,
@@ -181,7 +181,7 @@ public class ProjectsConfigOptionPlugin
     instance.defaultEnvironment = config.getDefaultEnvironment();
     instance.projectMandatory = config.isProjectMandatory();
     instance.environmentMandatory = config.isEnvironmentMandatory();
-    instance.standardParentProject = config.getStandardParentProject();
+    instance.standardLinkedProject = config.getStandardLinkedProject();
     instance.standardProjectsFolder = config.getStandardProjectsFolder();
     instance.defaultProjectConfigFile = config.getDefaultProjectConfigFile();
     instance.environmentsForActiveProject = config.isEnvironmentsForActiveProject();
@@ -232,11 +232,11 @@ public class ProjectsConfigOptionPlugin
         log.logBasic("The default environment is set to '" + defaultEnvironment + "'");
         changed = true;
       }
-      if (standardParentProject != null) {
-        config.setStandardParentProject(standardParentProject);
+      if (standardLinkedProject != null) {
+        config.setStandardLinkedProject(standardLinkedProject);
         log.logBasic(
             "The standard project to inherit from when creating a project is set to '"
-                + standardParentProject
+                + standardLinkedProject
                 + "'");
         changed = true;
       }
@@ -312,8 +312,8 @@ public class ProjectsConfigOptionPlugin
         case WIDGET_ID_DEFAULT_PROJECT:
           String defProject = ((ComboVar) control).getText();
           if (!StringUtils.isEmpty(defProject)) {
-            boolean defParentPrjExists = ProjectsUtil.projectExists(defProject);
-            if (!defParentPrjExists) {
+            boolean defStandardPrjExists = ProjectsUtil.projectExists(defProject);
+            if (!defStandardPrjExists) {
               MessageBox box =
                   new MessageBox(HopGui.getInstance().getShell(), SWT.OK | SWT.ICON_ERROR);
               box.setText(
@@ -334,11 +334,11 @@ public class ProjectsConfigOptionPlugin
           defaultEnvironment = ((TextVar) control).getText();
           ProjectsConfigSingleton.getConfig().setDefaultEnvironment(defaultEnvironment);
           break;
-        case WIDGET_ID_STANDARD_PARENT_PROJECT:
-          String stdParentProject = ((ComboVar) control).getText();
-          if (!StringUtils.isEmpty(stdParentProject)) {
-            boolean stdParentPrjExists = ProjectsUtil.projectExists(stdParentProject);
-            if (!stdParentPrjExists) {
+        case WIDGET_ID_STANDARD_LINKED_PROJECT:
+          String stdLinkedProject = ((ComboVar) control).getText();
+          if (!StringUtils.isEmpty(stdLinkedProject)) {
+            boolean stdLinkedPrjExists = ProjectsUtil.projectExists(stdLinkedProject);
+            if (!stdLinkedPrjExists) {
               MessageBox box =
                   new MessageBox(HopGui.getInstance().getShell(), SWT.OK | SWT.ICON_ERROR);
               box.setText(
@@ -346,12 +346,12 @@ public class ProjectsConfigOptionPlugin
               box.setMessage(
                   BaseMessages.getString(
                       PKG,
-                      "ProjectConfig.ProjectNotExists.StandardProject.Error.Message",
-                      stdParentProject));
+                          "ProjectConfig.ProjectNotExists.LinkedProject.Error.Message",
+                      stdLinkedProject));
               box.open();
             } else {
-              standardParentProject = stdParentProject;
-              ProjectsConfigSingleton.getConfig().setStandardParentProject(standardParentProject);
+              standardLinkedProject = stdLinkedProject;
+              ProjectsConfigSingleton.getConfig().setStandardLinkedProject(standardLinkedProject);
             }
           }
           break;
@@ -432,19 +432,19 @@ public class ProjectsConfigOptionPlugin
   }
 
   /**
-   * Gets standardParentProject
+   * Gets standardLinkedProject
    *
-   * @return value of standardParentProject
+   * @return value of standardLinkedProject
    */
-  public String getStandardParentProject() {
-    return standardParentProject;
+  public String getStandardLinkedProject() {
+    return standardLinkedProject;
   }
 
   /**
-   * @param standardParentProject The standardParentProject to set
+   * @param standardLinkedProject The standardLinkedProject to set
    */
-  public void setStandardParentProject(String standardParentProject) {
-    this.standardParentProject = standardParentProject;
+  public void setStandardLinkedProject(String standardLinkedProject) {
+    this.standardLinkedProject = standardLinkedProject;
   }
 
   /**

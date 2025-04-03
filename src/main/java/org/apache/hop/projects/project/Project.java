@@ -84,7 +84,7 @@ public class Project extends ConfigFile implements IConfigFile {
 
   private boolean enforcingExecutionInHome;
 
-  private String parentProjectName;
+  private String linkedProjectName;
 
   private MultiMetadataProvider metadataProvider;
 
@@ -149,7 +149,7 @@ public class Project extends ConfigFile implements IConfigFile {
       this.dataSetsCsvFolder = project.dataSetsCsvFolder;
       this.enforcingExecutionInHome = project.enforcingExecutionInHome;
       this.configMap = project.configMap;
-      this.parentProjectName = project.parentProjectName;
+      this.linkedProjectName = project.linkedProjectName;
     } catch (Exception e) {
       throw new HopException(
           "Error saving project configuration to file '" + configFilename + "'", e);
@@ -171,24 +171,24 @@ public class Project extends ConfigFile implements IConfigFile {
     //
     verifyProjectsChain(projectConfig.getProjectName(), variables);
 
-    // If there is a parent project we want to pick up the variables defined in the project
+    // If there is a linked project we want to pick up the variables defined in the project
     // definition as well
     //
-    Project parentProject = null;
-    String realParentProjectName = variables.resolve(parentProjectName);
-    if (StringUtils.isNotEmpty(realParentProjectName)) {
+    Project linkedProject = null;
+    String realLinkedProjectName = variables.resolve(linkedProjectName);
+    if (StringUtils.isNotEmpty(realLinkedProjectName)) {
 
-      ProjectConfig parentProjectConfig =
-          ProjectsConfigSingleton.getConfig().findProjectConfig(realParentProjectName);
-      if (parentProjectConfig != null) {
+      ProjectConfig linkedProjectConfig =
+          ProjectsConfigSingleton.getConfig().findProjectConfig(realLinkedProjectName);
+      if (linkedProjectConfig != null) {
         try {
-          parentProject = parentProjectConfig.loadProject(variables);
-          // Apply the variables set in the parent project
+          linkedProject = linkedProjectConfig.loadProject(variables);
+          // Apply the variables set in the linked project
           //
-          parentProject.modifyVariables(variables, parentProjectConfig, new ArrayList<>(), null);
+          linkedProject.modifyVariables(variables, linkedProjectConfig, new ArrayList<>(), null);
         } catch (HopException he) {
           LogChannel.GENERAL.logError(
-              "Error loading configuration file of parent project '" + realParentProjectName + "'",
+              "Error loading configuration file of linked project '" + realLinkedProjectName + "'",
               he);
         }
       }
@@ -246,7 +246,7 @@ public class Project extends ConfigFile implements IConfigFile {
       // If we have more than one metadata base folder to read metadata from, we can specify it
       // using comma separated values...
       //
-      if (parentProject != null) {
+      if (linkedProject != null) {
         // HOP_METADATA_FOLDER was set above in the variables.
         // We're going to simply append to it.
         //
@@ -279,44 +279,44 @@ public class Project extends ConfigFile implements IConfigFile {
    */
   public void verifyProjectsChain(String projectName, IVariables variables) throws HopException {
 
-    // No parent project: no danger
+    // No linked project: no danger
     //
-    if (StringUtils.isEmpty(parentProjectName)) {
+    if (StringUtils.isEmpty(linkedProjectName)) {
       return;
     }
 
-    if (parentProjectName.equals(projectName)) {
+    if (linkedProjectName.equals(projectName)) {
       throw new HopException(
-          "Parent project '" + parentProjectName + "' can not be the same as the project itself");
+          "Parent project '" + linkedProjectName + "' can not be the same as the project itself");
     }
 
     ProjectsConfig config = ProjectsConfigSingleton.getConfig();
 
-    String realParentProjectName = variables.resolve(parentProjectName);
+    String realLinkedProjectName = variables.resolve(linkedProjectName);
     List<String> projectsList = new ArrayList<>();
-    while (StringUtils.isNotEmpty(realParentProjectName)) {
-      projectsList.add(realParentProjectName);
-      ProjectConfig projectConfig = config.findProjectConfig(realParentProjectName);
+    while (StringUtils.isNotEmpty(realLinkedProjectName)) {
+      projectsList.add(realLinkedProjectName);
+      ProjectConfig projectConfig = config.findProjectConfig(realLinkedProjectName);
       if (projectConfig != null) {
-        Project parentProject = projectConfig.loadProject(variables);
-        if (parentProject == null) {
+        Project linkedProject = projectConfig.loadProject(variables);
+        if (linkedProject == null) {
           // Can't be loaded, break out of the loop
-          realParentProjectName = null;
+          realLinkedProjectName = null;
         } else {
           // See if this project has a parent...
           //
-          if (StringUtils.isEmpty(parentProject.parentProjectName)) {
+          if (StringUtils.isEmpty(linkedProject.linkedProjectName)) {
             // We're done
-            realParentProjectName = null;
+            realLinkedProjectName = null;
           } else {
-            realParentProjectName = variables.resolve(parentProject.parentProjectName);
-            if (StringUtils.isNotEmpty(realParentProjectName)) {
+            realLinkedProjectName = variables.resolve(linkedProject.linkedProjectName);
+            if (StringUtils.isNotEmpty(realLinkedProjectName)) {
               // See if we've had this one before...
               //
-              if (projectsList.contains(realParentProjectName)) {
+              if (projectsList.contains(realLinkedProjectName)) {
                 throw new HopException(
-                    "There is a loop in the parent projects hierarchy: project "
-                        + realParentProjectName
+                    "There is a loop in the linked projects hierarchy: project "
+                        + realLinkedProjectName
                         + " references itself");
               }
             }
@@ -324,7 +324,7 @@ public class Project extends ConfigFile implements IConfigFile {
         }
       } else {
         // Project not found: config error, stop looking
-        realParentProjectName = null;
+        realLinkedProjectName = null;
       }
     }
   }
@@ -738,15 +738,15 @@ public class Project extends ConfigFile implements IConfigFile {
    *
    * @return value of parentProjectName
    */
-  public String getParentProjectName() {
-    return parentProjectName;
+  public String getLinkedProjectName() {
+    return linkedProjectName;
   }
 
   /**
-   * @param parentProjectName The parentProjectName to set
+   * @param linkedProjectName The parentProjectName to set
    */
-  public void setParentProjectName(String parentProjectName) {
-    this.parentProjectName = parentProjectName;
+  public void setLinkedProjectName(String linkedProjectName) {
+    this.linkedProjectName = linkedProjectName;
   }
 
   public MultiMetadataProvider getMetadataProvider() {

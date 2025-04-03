@@ -218,26 +218,26 @@ public class ProjectsUtil {
     return prjFound;
   }
 
-  public static List<String> getParentProjectReferences(String projectName) throws HopException {
+  public static List<String> getLinkedProjectReferences(String projectName) throws HopException {
 
     ProjectsConfig config = ProjectsConfigSingleton.getConfig();
     List<String> prjs = config.listProjectConfigNames();
 
     HopGui hopGui = HopGui.getInstance();
-    List<String> parentProjectReferences = new ArrayList<>();
+    List<String> linkedProjectReferences = new ArrayList<>();
     ProjectConfig currentProjectConfig = config.findProjectConfig(projectName);
 
     if (currentProjectConfig == null) {
-      parentProjectReferences = Collections.EMPTY_LIST;
+      linkedProjectReferences = Collections.EMPTY_LIST;
     } else {
       for (String prj : prjs) {
         if (!prj.equals(projectName)) {
           ProjectConfig prjCfg = config.findProjectConfig(prj);
           Project thePrj = prjCfg.loadProject(hopGui.getVariables());
           if (thePrj != null) {
-            if (thePrj.getParentProjectName() != null
-                && thePrj.getParentProjectName().equals(projectName)) {
-              parentProjectReferences.add(prj);
+            if (thePrj.getLinkedProjectName() != null
+                && thePrj.getLinkedProjectName().equals(projectName)) {
+              linkedProjectReferences.add(prj);
             }
           } else {
             hopGui.getLog().logError("Unable to load project '" + prj + "' from its configuration");
@@ -245,30 +245,30 @@ public class ProjectsUtil {
         }
       }
     }
-    return parentProjectReferences;
+    return linkedProjectReferences;
   }
 
-  public static List<String> changeParentProjectReferences(String currentName, String newName)
+  public static List<String> changeLinkedProjectReferences(String currentName, String newName)
       throws HopException {
 
     ProjectsConfig config = ProjectsConfigSingleton.getConfig();
     List<String> prjs = config.listProjectConfigNames();
 
     HopGui hopGui = HopGui.getInstance();
-    List<String> parentProjectReferences = new ArrayList<>();
+    List<String> linkedProjectReferences = new ArrayList<>();
     ProjectConfig currentProjectConfig = config.findProjectConfig(currentName);
 
     if (currentProjectConfig == null) {
-      parentProjectReferences = Collections.EMPTY_LIST;
+      linkedProjectReferences = Collections.EMPTY_LIST;
     } else {
       for (String prj : prjs) {
         if (!prj.equals(currentName)) {
           ProjectConfig prjCfg = config.findProjectConfig(prj);
           Project thePrj = prjCfg.loadProject(hopGui.getVariables());
           if (thePrj != null) {
-            if (thePrj.getParentProjectName() != null
-                && thePrj.getParentProjectName().equals(currentName)) {
-              thePrj.setParentProjectName(newName);
+            if (thePrj.getLinkedProjectName() != null
+                && thePrj.getLinkedProjectName().equals(currentName)) {
+              thePrj.setLinkedProjectName(newName);
             }
           } else {
             hopGui.getLog().logError("Unable to load project '" + prj + "' from its configuration");
@@ -276,6 +276,6 @@ public class ProjectsUtil {
         }
       }
     }
-    return parentProjectReferences;
+    return linkedProjectReferences;
   }
 }

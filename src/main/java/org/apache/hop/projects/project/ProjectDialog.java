@@ -76,7 +76,7 @@ public class ProjectDialog extends Dialog {
 
   private Text wName;
   private TextVar wHome;
-  private ComboVar wParentProject;
+  private ComboVar wLinkedProject;
   private TextVar wConfigFile;
   private Text wDescription;
   private Text wCompany;
@@ -234,22 +234,22 @@ public class ProjectDialog extends Dialog {
     wConfigFile.setLayoutData(fdConfigFile);
     lastControl = wConfigFile;
 
-    Label wlParentProject = new Label(comp, SWT.RIGHT);
-    PropsUi.setLook(wlParentProject);
-    wlParentProject.setText(BaseMessages.getString(PKG, "ProjectDialog.Label.ParentProject"));
-    FormData fdlParentProject = new FormData();
-    fdlParentProject.left = new FormAttachment(0, 0);
-    fdlParentProject.right = new FormAttachment(middle, 0);
-    fdlParentProject.top = new FormAttachment(lastControl, margin);
-    wlParentProject.setLayoutData(fdlParentProject);
-    wParentProject = new ComboVar(variables, comp, SWT.SINGLE | SWT.BORDER | SWT.LEFT);
-    PropsUi.setLook(wParentProject);
-    FormData fdParentProject = new FormData();
-    fdParentProject.left = new FormAttachment(middle, margin);
-    fdParentProject.right = new FormAttachment(98, 0);
-    fdParentProject.top = new FormAttachment(wlParentProject, 0, SWT.CENTER);
-    wParentProject.setLayoutData(fdParentProject);
-    lastControl = wParentProject;
+    Label wlLinkedProject = new Label(comp, SWT.RIGHT);
+    PropsUi.setLook(wlLinkedProject);
+    wlLinkedProject.setText(BaseMessages.getString(PKG, "ProjectDialog.Label.LinkedProject"));
+    FormData fdlLinkedProject = new FormData();
+    fdlLinkedProject.left = new FormAttachment(0, 0);
+    fdlLinkedProject.right = new FormAttachment(middle, 0);
+    fdlLinkedProject.top = new FormAttachment(lastControl, margin);
+    wlLinkedProject.setLayoutData(fdlLinkedProject);
+    wLinkedProject = new ComboVar(variables, comp, SWT.SINGLE | SWT.BORDER | SWT.LEFT);
+    PropsUi.setLook(wLinkedProject);
+    FormData fdLinkedProject = new FormData();
+    fdLinkedProject.left = new FormAttachment(middle, margin);
+    fdLinkedProject.right = new FormAttachment(98, 0);
+    fdLinkedProject.top = new FormAttachment(wlLinkedProject, 0, SWT.CENTER);
+    wLinkedProject.setLayoutData(fdLinkedProject);
+    lastControl = wLinkedProject;
 
     Label wlDescription = new Label(comp, SWT.RIGHT);
     PropsUi.setLook(wlDescription);
@@ -427,7 +427,7 @@ public class ProjectDialog extends Dialog {
 
     // See if we need a project refresh/reload
     //
-    wParentProject.addModifyListener(e -> needingProjectRefresh = true);
+    wLinkedProject.addModifyListener(e -> needingProjectRefresh = true);
     wHome.addModifyListener(e -> needingProjectRefresh = true);
 
     getData();
@@ -584,11 +584,11 @@ public class ProjectDialog extends Dialog {
         throw new HopException("Please specify project's configuration file relative path!");
       }
 
-      if (wParentProject.getText() != null
-          && !wParentProject.getText().isEmpty()
-          && projectName.equals(wParentProject.getText())) {
+      if (wLinkedProject.getText() != null
+          && !wLinkedProject.getText().isEmpty()
+          && projectName.equals(wLinkedProject.getText())) {
         throw new HopException(
-            CONST_PROJECT + projectName + "' cannot be set as a parent project of itself");
+            CONST_PROJECT + projectName + "' cannot be set as a linked project of itself");
       }
 
       ProjectsConfig prjsCfg = ProjectsConfigSingleton.getConfig();
@@ -606,25 +606,25 @@ public class ProjectDialog extends Dialog {
       }
 
       HopGui hopGui = HopGui.getInstance();
-      if (wParentProject.getText() != null && !wParentProject.getText().isEmpty()) {
+      if (wLinkedProject.getText() != null && !wLinkedProject.getText().isEmpty()) {
 
-        boolean parentPrjExists = ProjectsUtil.projectExists(wParentProject.getText());
-        if (!parentPrjExists)
+        boolean linkedPrjExists = ProjectsUtil.projectExists(wLinkedProject.getText());
+        if (!linkedPrjExists)
           throw new HopException(
               CONST_PROJECT
-                  + wParentProject.getText()
-                  + "' cannot be set as parent project because it does not exists!");
+                  + wLinkedProject.getText()
+                  + "' cannot be set as linked project because it does not exists!");
 
-        ProjectConfig parentPrjCfg = prjsCfg.findProjectConfig(wParentProject.getText());
-        Project parentPrj = parentPrjCfg.loadProject(hopGui.getVariables());
-        if (parentPrj.getParentProjectName() != null
-            && parentPrj.getParentProjectName().equals(projectName))
+        ProjectConfig linkedPrjCfg = prjsCfg.findProjectConfig(wLinkedProject.getText());
+        Project linkedPrj = linkedPrjCfg.loadProject(hopGui.getVariables());
+        if (linkedPrj.getLinkedProjectName() != null
+            && linkedPrj.getLinkedProjectName().equals(projectName))
           throw new HopException(
               CONST_PROJECT
                   + projectName
                   + "' cannot reference '"
-                  + wParentProject.getText()
-                  + "' as parent project because we are going to create a circular reference!");
+                  + wLinkedProject.getText()
+                  + "' as linked project because we are going to create a circular reference!");
       }
 
       // Manage changing in project's home folder
@@ -645,10 +645,10 @@ public class ProjectDialog extends Dialog {
 
       // Change references to project's name if it changed
       if (!oriProjectName.equals(projectName)) {
-        List<String> refs = ProjectsUtil.getParentProjectReferences(oriProjectName);
+        List<String> refs = ProjectsUtil.getLinkedProjectReferences(oriProjectName);
 
         if (!refs.isEmpty()) {
-          ProjectsUtil.changeParentProjectReferences(oriProjectName, projectName);
+          ProjectsUtil.changeLinkedProjectReferences(oriProjectName, projectName);
         }
       }
 
@@ -698,16 +698,16 @@ public class ProjectDialog extends Dialog {
     wVariables.setRowNums();
     wVariables.optWidth(true);
 
-    // Parent project...
+    // Linked project...
     //
     try {
-      wParentProject.setText(Const.NVL(project.getParentProjectName(), ""));
+      wLinkedProject.setText(Const.NVL(project.getLinkedProjectName(), ""));
 
       List<String> names = ProjectsConfigSingleton.getConfig().listProjectConfigNames();
       if (projectConfig.getProjectName() != null) {
         names.remove(projectConfig.getProjectName());
       }
-      wParentProject.setItems(names.toArray(new String[0]));
+      wLinkedProject.setItems(names.toArray(new String[0]));
     } catch (Exception e) {
       new ErrorDialog(
           shell,
@@ -723,7 +723,7 @@ public class ProjectDialog extends Dialog {
     projectConfig.setProjectHome(wHome.getText());
     projectConfig.setConfigFilename(wConfigFile.getText());
 
-    project.setParentProjectName(wParentProject.getText());
+    project.setLinkedProjectName(wLinkedProject.getText());
     project.setDescription(wDescription.getText());
     project.setCompany(wCompany.getText());
     project.setDepartment(wDepartment.getText());
