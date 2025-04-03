@@ -35,7 +35,7 @@ import org.apache.hop.ui.hopgui.delegates.HopGuiFileOpenedExtension;
 @ExtensionPoint(
     id = "HopGuiFileReplaceHomeVariable",
     extensionPointId = "HopGuiFileOpenedDialog",
-    description = "Replace ${PROJECT_HOME} in selected filenames as a best practice aid")
+    description = "Replace ${PROJECT_HOME} or ${LINKED_PROJECT_HOME} in selected filenames as a best practice aid")
 public class HopGuiFileReplaceHomeVariable implements IExtensionPoint<HopGuiFileOpenedExtension> {
 
   // TODO make this optional
@@ -86,6 +86,7 @@ public class HopGuiFileReplaceHomeVariable implements IExtensionPoint<HopGuiFile
                   + absoluteFile.substring(absoluteHome.length());
         }
       }
+
     } catch (Exception e) {
       log.logError("Error setting default folder for project " + projectName, e);
     }

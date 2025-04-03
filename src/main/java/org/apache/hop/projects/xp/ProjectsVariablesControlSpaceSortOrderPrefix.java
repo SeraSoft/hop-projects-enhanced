@@ -37,6 +37,7 @@ public class ProjectsVariablesControlSpaceSortOrderPrefix
       ILogChannel log, IVariables variables, Map<String, String> prefixMap) throws HopException {
 
     prefixMap.put(ProjectsUtil.VARIABLE_PROJECT_HOME, "310_");
+    prefixMap.put(ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME, "310_");
     prefixMap.put(Defaults.VARIABLE_HOP_PROJECT_NAME, "450_");
     prefixMap.put(Defaults.VARIABLE_HOP_ENVIRONMENT_NAME, "450_");
     prefixMap.put(ProjectsUtil.VARIABLE_HOP_DATASETS_FOLDER, "450_");

@@ -186,6 +186,10 @@ public class Project extends ConfigFile implements IConfigFile {
           // Apply the variables set in the linked project
           //
           linkedProject.modifyVariables(variables, linkedProjectConfig, new ArrayList<>(), null);
+          // Set the LINKED_PROJECT_NAME variable to the root of the linked project name
+            variables.setVariable(
+                ProjectsUtil.VARIABLE_LINKED_PROJECT_HOME,
+                Const.NVL(linkedProjectConfig.getProjectHome(), ""));
         } catch (HopException he) {
           LogChannel.GENERAL.logError(
               "Error loading configuration file of linked project '" + realLinkedProjectName + "'",
